@@ -1,4 +1,4 @@
-from blist import blist
+import blist
 from util import *
 
 
@@ -6,10 +6,10 @@ class DNA():
     "Like BList, but has DNA semantics for index/slice"
 
     def __init__(self, sequence):
-        if isinstance(sequence, blist):
+        if isinstance(sequence, blist.blist):
             self.blist = sequence
         elif isinstance(sequence, str):
-            self.blist = blist(sequence)
+            self.blist = blist.blist(sequence)
         else:
             raise TypeError
 
@@ -17,23 +17,29 @@ class DNA():
         "Flexible equality that implicitly converts 'str' and 'blist' types"
         if isinstance(sequence, DNA):
             return self.blist == sequence.blist
-        if isinstance(sequence, blist):
+        if isinstance(sequence, blist.blist):
             return self.blist == sequence
         elif isinstance(sequence, str):
-            return self.blist == blist(sequence)
+            return self.blist == blist.blist(sequence)
         else:
             raise TypeError
 
     def raw_str(self):
         return ''.join(self.blist)
 
-    def head_str(self):
-        return str(self)
+    def head_str(self, prefix_len=10):
+        # max length to print
+        stop = min(len(self), prefix_len)
+        string = ''.join(self.blist[0:stop])
+        return "%s%s %8s" % (string, '' if len(self) <= prefix_len else '...',
+                             len(self))
 
     def __str__(self):
-        prefix_len = 50  # max length to print
-        return "%s:%s%s" % (len(self), str(''.join(self.blist[0:prefix_len])),
-                            '' if len(self) <= prefix_len else '...')
+        prefix_len = 10  # max length to print
+        stop = min(len(self), prefix_len)
+        string = ''.join(self.blist[0:stop])
+        return "%s%s %8s" % (string, '' if len(self) <= prefix_len else '...',
+                             len(self))
 
     def __add__(self, other):
         return DNA(self.blist + other.blist)
@@ -70,8 +76,11 @@ class DNA():
         self.blist.insert(*args)
 
     def pop(self, n):
-        "Remove n elements from head of sequence"
-        del self.blist[0:min(n, len(self))]
+        "Remove and return n elements from head of sequence"
+        stop = min(n, len(self))
+        ret = DNA(self.blist[0:stop])
+        del self.blist[0:stop]
+        return ret
 
     def index(self, sub_dna, begin):
         "Returns index of sub_dna in self, or else None"
@@ -79,8 +88,8 @@ class DNA():
         # Unwrap to avoid excess allocations of DNA object.
         sub_dna_b = sub_dna.blist
         dna_b = self.blist
-        found = ''.join(dna_b[begin:]).find(''.join(sub_dna_b))
-        return None if found == -1 else found
+        found_after_begin = ''.join(dna_b[begin:]).find(''.join(sub_dna_b))
+        return None if found_after_begin == -1 else begin + found_after_begin
 
 
 class Base:
@@ -99,6 +108,8 @@ P = Base.P
 # DNA :: blist[Base]
 
 empty = lambda: DNA('')
+# FIXME: add enforced freeze
+const_empty = empty()
 
 
 class PItem:
@@ -130,8 +141,8 @@ class PSkip(PItem):
 
 
 class PSearch(PItem):
-    def __init__(self, dna_literal):
-        self.dna_literal = dna_literal
+    def __init__(self, dna):
+        self.dna_literal = (dna if isinstance(dna, DNA) else DNA(dna))
 
     def __str__(self):
         return '<%s>' % self.dna_literal.raw_str()
@@ -147,6 +158,10 @@ class PGroup(PItem):
 
 POpen = PGroup('(')
 PClose = PGroup(')')
+
+
+def p_capture(pitems):
+    return [POpen] + pitems + [PClose]
 
 
 class TProtectedReference(PItem):
@@ -183,9 +198,29 @@ QUOTE_BASE = {
     'P': 'IC',
 }
 
+UNQUOTE_BASE = {
+    'C': 'I',
+    'F': 'C',
+    'P': 'F',
+    'IC': 'P',
+}
+
 
 def quote(dna):
     return DNA(''.join([QUOTE_BASE[b] for b in dna]))
+
+
+def parse_nat(nat_str):
+    "Convert a non-P-terminated binary-IC string to int."
+    n = 0
+    for power in range(0, len(nat_str)):
+        h = nat_str[power]
+        if h in ['I', 'F']:
+            # 0 bit in this position
+            pass
+        elif h == 'C':
+            n += 1 << power
+    return n
 
 
 def asnat(n):
@@ -205,6 +240,9 @@ def asnat(n):
 class Pattern:
     def __init__(self, pitems=None):
         self.pitems = (pitems or [])[:]  # defensive copy from input
+
+    def __eq__(self, other):
+        return self.pitems == other.pitems
 
     def __str__(self):
         return ''.join([str(pitem) for pitem in self.pitems])

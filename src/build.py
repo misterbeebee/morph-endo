@@ -45,21 +45,21 @@ def build(rna):
     Builder().build(rna)
 
 
-def addColorsTo(colors, bucketRGB, bucketA):
+def addColorsTo(colors, bktRGB, bktA):
     for c in colors:
-        addColorTo(c, bucketRGB, bucketA)
+        addColorTo(c, bktRGB, bktA)
 
 
-def addColorTo(color, bucketRGB, bucketA):
+def addColorTo(color, bktRGB, bktA):
     if isRGB(color):
-        bucketRGB.insert(0, color)
+        bktRGB.insert(0, color)
     elif isTransparency(color):
-        bucketA.insert(0, color)
+        bktA.insert(0, color)
 
 
-def currentPixel(bucketRGB, bucketA):
-    (r, g, b) = averageRGB(bucketRGB, 0)
-    a = average(bucketA, 255)
+def currentPixel(bktRGB, bktA):
+    (r, g, b) = averageRGB(bktRGB, 0)
+    a = average(bktA, 255)
     return (tuple(map(lambda c: (c * a) // 255, (r, g, b))), a)
 
 
@@ -77,10 +77,10 @@ def average(values, default):
 
 
 def testColor(colors, pixel):
-    bucketRGB = []
-    bucketA = []
-    addColorsTo(colors, bucketRGB, bucketA)
-    assert_eq(currentPixel(bucketRGB, bucketA), pixel)
+    bktRGB = []
+    bktA = []
+    addColorsTo(colors, bktRGB, bktA)
+    assert_eq(currentPixel(bktRGB, bktA), pixel)
 
 
 def testColors():
@@ -122,21 +122,21 @@ def getPixel(bitmap, pos):
     return (bitmap)[y][x]
 
 
-def setPixel(bitmap, pos, bucketRGB, bucketA):
-    pixel = currentPixel(bucketRGB, bucketA)
+def setPixel(bitmap, pos, bktRGB, bktA):
+    pixel = currentPixel(bktRGB, bktA)
     setPixelFaster(bitmap, pos, pixel)
 
 
 def setPixelFaster(bitmap, pos, pixel):
     (x, y) = pos
-    # log(INFO, "setPixel(): bitmap[%s][%s] = %s " % (x, y, pixel))
+    # log(INFO, lambda: "setPixel(): bitmap[%s][%s] = %s " % (x, y, pixel))
     # indices reverse to make array in row-major order
     bitmap[y][x] = pixel
 
 
-def line(pos0, pos1, bitmap, bucketRGB, bucketA):
-    # log(INFO,
-    #    "line(%s, %s) -> %s" % (pos0, pos1, currentPixel(bucketRGB, bucketA)))
+def line(pos0, pos1, bitmap, bktRGB, bktA):
+    # log(INFO, lambda:
+    #    "line(%s, %s) -> %s" % (pos0, pos1, currentPixel(bktRGB, bktA)))
     (x0, y0) = pos0
     (x1, y1) = pos1
     deltax = x1 - x0
@@ -145,7 +145,7 @@ def line(pos0, pos1, bitmap, bucketRGB, bucketA):
     c = 1 if (deltax * deltay <= 0) else 0  # why??
     x = x0 * d + (d - c) // 2
     y = y0 * d + (d - c) // 2
-    pixel = currentPixel(bucketRGB, bucketA)
+    pixel = currentPixel(bktRGB, bktA)
     for i in range(0, d):
         #log("INFO", "setPixelFaster(%s, %s)" % (((x // d), (y // d)), pixel))
         setPixelFaster(bitmap, ((x // d), (y // d)), pixel)
@@ -155,22 +155,22 @@ def line(pos0, pos1, bitmap, bucketRGB, bucketA):
     setPixelFaster(bitmap, (x1, y1), pixel)
 
 
-def tryfill(position, bitmap, bucketRGB, bucketA):
-    new = currentPixel(bucketRGB, bucketA)
+def tryfill(position, bitmap, bktRGB, bktA):
+    new = currentPixel(bktRGB, bktA)
     old = getPixel(bitmap, position)
-    log(INFO, "tryfill(%s) %s->%s" % (position, old, new))
-    if new != old: fill(position, old, bitmap, bucketRGB, bucketA)
+    log(INFO, lambda: "tryfill(%s) %s->%s" % (position, old, new))
+    if new != old: fill(position, old, bitmap, bktRGB, bktA)
 
 
-def fill(pos, initial, bitmap, bucketRGB, bucketA):
-    log(INFO, "fill(%s, %s)" % (pos, initial))
+def fill(pos, initial, bitmap, bktRGB, bktA):
+    log(INFO, lambda: "fill(%s, %s)" % (pos, initial))
     queue = blist.sortedset([pos])
     # Change all adjacent pixels of same initial color to new color
     queued = 1
     filled = 0
     iters = 0
     skipped = 0
-    pixel = currentPixel(bucketRGB, bucketA)
+    pixel = currentPixel(bktRGB, bktA)
     setPixelFaster(bitmap, pos, pixel)
     while queue:
         if iters % 40000 == 0:
@@ -223,7 +223,7 @@ addCount = 0
 
 def addBitmap(bitmaps, b):
     global addCount
-    log(INFO, "addBitmap()")
+    log(INFO, lambda: "addBitmap()")
     draw([bitmaps[0]], "pre-add.%s" % addCount)
     addCount += 1
     if len(bitmaps) < 10:
@@ -245,7 +245,7 @@ def pop_bitmap(bitmaps):
 
 
 def compose(bitmaps):
-    log(INFO, "compose()")
+    log(INFO, lambda: "compose()")
     # Merge front 2 bitmaps
     if len(bitmaps) >= 2:
         for x in range(0, 600):
@@ -264,7 +264,7 @@ def compose(bitmaps):
 
 
 def clip(bitmaps):
-    log(INFO, "clip()")
+    log(INFO, lambda: "clip()")
     # Apply bitmap1's alpha channel as a filter to next bitmap
     if len(bitmaps) >= 2:
         for x in range(0, 600):
@@ -274,23 +274,26 @@ def clip(bitmaps):
                 pixel = (((r1 * a0) // 255, (g1 * a0) // 255,
                           (b1 * a0) // 255), (a1 * a0) // 255)
                 bitmaps[1][x][y] = pixel
-                log(INFO, "clip():  bitmaps[0][%s][%s] = %s " % (x, y, pixel))
+                log(
+                    INFO,
+                    lambda: "clip():  bitmaps[0][%s][%s] = %s " % (x, y, pixel)
+                )
         pop_bitmap(bitmaps)
     else:
         log(WARNING, "Tried to clip single bitmap")
 
 
 def buildRNA(rna, prefix_name):
-    bucketRGB = []  # [color]
-    bucketA = []  # [color]
+    bktRGB = []  # [color]
+    bktA = []  # [color]
     position = (0, 0)
     mark = (0, 0)
     direction = E
     bitmaps = [transparentBitmap()]  # [bitmap]
-    addColor = lambda c: addColorTo(c, bucketRGB, bucketA)
+    addColor = lambda c: addColorTo(c, bktRGB, bktA)
 
     for r in rna:
-        if r == 'PIPIIIC': addColor(black)
+        if (r) == 'PIPIIIC': addColor(black)
         elif r == 'PIPIIIP': addColor(red)
         elif r == 'PIPIICC': addColor(green)
         elif r == 'PIPIICF': addColor(yellow)
@@ -300,21 +303,19 @@ def buildRNA(rna, prefix_name):
         elif r == 'PIPIIPC': addColor(white)
         elif r == 'PIPIIPF': addColor(transparent)
         elif r == 'PIPIIPP': addColor(opaque)
-        elif r == 'PIIPICP': (bucketRGB, bucketA) = ([], [])
+
+        elif r == 'PIIPICP': (bktRGB, bktA) = ([], [])
+
         elif r == 'PIIIIIP': position = move(position, direction)
         elif r == 'PCCCCCP': direction = turnCounterClockwise(direction)
         elif r == 'PFFFFFP': direction = turnClockwise(direction)
+
         elif r == 'PCCIFFP': mark = position
-        elif r == 'PFFICCP':
-            line(position, mark, bitmaps[0], bucketRGB, bucketA)
-        elif r == 'PIIPIIP':
-            tryfill(position, bitmaps[0], bucketRGB, bucketA)
-        elif r == 'PCCPFFP':
-            addBitmap(bitmaps, transparentBitmap())
-        elif r == 'PFFPCCP':
-            compose(bitmaps)
-        elif r == 'PFFICCF':
-            clip(bitmaps)
+        elif r == 'PFFICCP': line(position, mark, bitmaps[0], bktRGB, bktA)
+        elif r == 'PIIPIIP': tryfill(position, bitmaps[0], bktRGB, bktA)
+        elif r == 'PCCPFFP': addBitmap(bitmaps, transparentBitmap())
+        elif r == 'PFFPCCP': compose(bitmaps)
+        elif r == 'PFFICCF': clip(bitmaps)
         else:
             log(SIDE_CHANNEL, "build(): junk RNA: %s" % r)
     draw(bitmaps, prefix_name)  # all alpha values are set to 255!

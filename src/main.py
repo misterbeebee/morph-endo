@@ -1,51 +1,19 @@
 import os
 import sys
+import datetime
+
 # http://stutzbachenterprises.com/blist/blist.html
 from blist import blist
-import build
 
+import build
 from util import *
 from arrow import Arrow
+from dna import *
+import test
 
 
-def test():
-    print(Pattern([
-        PBase('C'),
-        POpen,
-        PSkip(10),
-        PSearch('ICFPPCFI'),
-        PClose,
-    ]))
-
-    icfp = DNA('ICFP')
-    assert_eq(icfp[0:2], DNA('IC'))
-    assert_eq(icfp[2:0], empty())
-    assert_eq(icfp[2:2], empty())
-    assert_eq(icfp[2:3], DNA('F'))
-    assert_eq(icfp[2], F)
-    assert_eq(icfp[2:6], DNA('FP'))
-    assert_eq(icfp[2:None], DNA('FP'))
-    assert_eq(icfp[6], '')  # Spec is poorly typed for this case.
-
-    dna = DNA('ABC')
-    dna.pop(1)
-    assert_eq(dna, 'BC')
-
-    cases = {'CIIC': 'I', 'IIPIPICPIICICIIF': '(<2>)P'}
-    for prefix in cases:
-        a = Arrow(prefix_dna=prefix)
-        p = a.consume_pattern()
-        assert_eq(
-            str(p), cases[prefix],
-            '\n\tdna_in=%s\n\tdna_out=%s ' % (prefix, str(a.dna)))
-
-    cases = {'IPPPICIIC': '[0^0]P'}
-    for prefix in cases:
-        a = Arrow(prefix_dna=prefix)
-        p = a.consume_template()
-        assert_eq(
-            str(p), cases[prefix],
-            '\n\tdna_in=%s\n\tdna_out=%s ' % (prefix, str(a.dna)))
+def decode_pattern(pattern_str):
+    return Arrow(prefix_str=pattern_str).consume_pattern()
 
 
 PRE_TEST_PREFIX = 'IIPIFFCPICICIICPIICIPPPICIIC'
@@ -61,24 +29,46 @@ def load_endo_dna():
     return dna_str
 
 
-def main():
-    # test()
-    print("hi")
-    build.testColors()
-    #prefix_name = 'pre_test'
-    #prefix_str = PRE_TEST_PREFIX
+def remove_comments_and_space(string):
+    # remove comments and then linebreaks:
+    noncomments = ''.join([line.split('#')[0] for line in string.split('\n')])
+    return ''.join([x for x in noncomments if not x.isspace()])
 
-    prefix_name = 'self_test'
-    prefix_str = SELF_TEST_PREFIX
+
+def read_dna_file(dna_dir, dna_file_basename):
+    dna_file = open(file=(dna_dir + dna_file_basename), mode='r')
+    dna = remove_comments_and_space(dna_file.read())
+    dna_file.close()
+    print('read DNA file done:', dna_file_basename)
+    return dna
+
+
+def run_prefix_from_file(filename):
+    dna = read_dna_file(
+        dna_dir=(os.getcwd() + '/../data/prefix/'), dna_file_basename=filename)
+    arrow = Arrow(
+        prefix_name=filename,
+        prefix_str=dna,
+        endo_dna_str=load_endo_dna(),
+        archive_consumption=True)
+    arrow.execute()
+    build.buildRNA(arrow.rna, arrow.prefix_name)
+
+
+def main():
+    log(FORCED, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    test.test()
+
+    prefix_name = 'pre_test'
+    prefix_str = PRE_TEST_PREFIX
+
+    # prefix_name = 'self_test'
+    # prefix_str = SELF_TEST_PREFIX
 
     # prefix_name = 'original_endo'
     # prefix_str = ''
-    arrow = Arrow(
-        prefix_name=prefix_name,
-        prefix_str=prefix_str,
-        endo_dna_str=load_endo_dna())
-    arrow.execute()
-    build.buildRNA(arrow.rna, arrow.prefix_name)
+
+    run_prefix_from_file('guide-0000100.dna')
 
 
 main()
